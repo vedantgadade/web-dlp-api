@@ -16,10 +16,22 @@ ROOT = Path(__file__).resolve().parent
 DOWNLOADS = ROOT / "downloads"
 DOWNLOADS.mkdir(exist_ok=True)
 
-app = FastAPI(title="VGSAVE", version="1.2.0")
+app = FastAPI(title="VGSAVE", version="1.4.0")
 
 jobs = {}
 jobs_lock = threading.Lock()
+
+# Standard VGSAVE quality ladder.
+QUALITY_LADDER = [
+    144,
+    240,
+    360,
+    480,
+    720,
+    1080,
+    1440,
+    2160,
+]
 
 
 class DetectBody(BaseModel):
@@ -60,15 +72,10 @@ def public_url(value: str) -> bool:
 def base_ytdlp():
     return [
         "yt-dlp",
-
         "--no-playlist",
         "--no-warnings",
-
-        # JavaScript runtime for modern sites.
         "--js-runtimes",
         "deno",
-
-        # Normal browser user agent.
         "--user-agent",
         (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -76,19 +83,12 @@ def base_ytdlp():
             "(KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
-
-        # Try normal YouTube clients.
         "--extractor-args",
         "youtube:player_client=android,web",
     ]
 
 
 def probe(url: str):
-    """
-    Ask yt-dlp for complete information about the media.
-    No media is downloaded here.
-    """
-
     command = base_ytdlp() + [
         "--dump-single-json",
         "--skip-download",
@@ -124,30 +124,16 @@ def probe(url: str):
 
 
 def collect_formats(info):
-    """
-    Collect all video formats from the extractor.
-
-    Different websites expose formats differently, so we check:
-    - normal formats
-    - requested_formats
-    - top-level media information
-    """
-
     formats = []
 
-    normal_formats = info.get("formats") or []
-
-    for item in normal_formats:
+    for item in info.get("formats") or []:
         if isinstance(item, dict):
             formats.append(item)
 
-    requested_formats = info.get("requested_formats") or []
-
-    for item in requested_formats:
+    for item in info.get("requested_formats") or []:
         if isinstance(item, dict):
             formats.append(item)
 
-    # Some extractors expose one direct video at top level.
     if info.get("url"):
         formats.append(info)
 
@@ -155,10 +141,6 @@ def collect_formats(info):
 
 
 def get_height(media_format):
-    """
-    Safely get the real video height.
-    """
-
     try:
         height = media_format.get("height")
 
@@ -168,7 +150,15 @@ def get_height(media_format):
     except Exception:
         pass
 
-    # Some extractors expose resolution like 1080x1920.
+    try:
+        height = media_format.get("video_height")
+
+        if height:
+            return int(height)
+
+    except Exception:
+        pass
+
     resolution = media_format.get("resolution")
 
     if resolution:
@@ -183,24 +173,10 @@ def get_height(media_format):
             except Exception:
                 pass
 
-    # Other extractors can expose width/height as strings.
-    try:
-        height = media_format.get("video_height")
-
-        if height:
-            return int(height)
-
-    except Exception:
-        pass
-
     return 0
 
 
 def is_video_format(media_format):
-    """
-    Check whether a format actually contains video.
-    """
-
     vcodec = str(
         media_format.get("vcodec") or ""
     ).lower()
@@ -208,28 +184,10 @@ def is_video_format(media_format):
     if vcodec and vcodec != "none":
         return True
 
-    # Direct media formats may not always expose vcodec.
-    height = get_height(media_format)
-
-    if height > 0:
-        return True
-
-    return False
+    return get_height(media_format) > 0
 
 
-def available_qualities(info):
-    """
-    Return ONLY the real video heights available from the source.
-
-    Example:
-        1080p
-        720p
-        480p
-        360p
-
-    No fake quality buttons are created.
-    """
-
+def actual_video_heights(info):
     heights = set()
 
     for media_format in collect_formats(info):
@@ -239,23 +197,49 @@ def available_qualities(info):
 
         height = get_height(media_format)
 
-        if height > 0:
+        if 1 <= height <= 10000:
             heights.add(height)
 
-    # Remove impossible values.
-    heights = {
-        h for h in heights
-        if 1 <= h <= 10000
-    }
+    return heights
 
-    # Highest quality first.
+
+def standard_qualities(info):
+    """
+    Convert the source maximum into VGSAVE's
+    standard quality ladder.
+    """
+
+    heights = actual_video_heights(info)
+
+    if not heights:
+        return []
+
+    maximum = max(heights)
+
     return [
-        f"{height}p"
-        for height in sorted(
-            heights,
-            reverse=True,
-        )
+        f"{quality}p"
+        for quality in QUALITY_LADDER
+        if quality <= maximum
     ]
+
+
+def has_video_at_or_below(info, requested_height):
+    """
+    Check whether the source contains a video
+    stream at or below the requested height.
+    """
+
+    for media_format in collect_formats(info):
+
+        if not is_video_format(media_format):
+            continue
+
+        height = get_height(media_format)
+
+        if 0 < height <= requested_height:
+            return True
+
+    return False
 
 
 def set_job(job_id, **values):
@@ -266,9 +250,90 @@ def set_job(job_id, **values):
         ).update(values)
 
 
-def run_download(job_id, body):
-    try:
+def find_output_file(job_id):
+    candidates = [
+        path
+        for path in DOWNLOADS.glob(
+            f"{job_id}.*"
+        )
+        if (
+            path.is_file()
+            and path.suffix.lower()
+            not in {
+                ".part",
+                ".ytdl",
+            }
+        )
+    ]
 
+    if not candidates:
+        return None
+
+    return max(
+        candidates,
+        key=lambda path: path.stat().st_mtime,
+    )
+
+
+def convert_video_to_quality(
+    source,
+    target,
+    requested_height,
+):
+    """
+    Use FFmpeg to create the exact requested
+    VGSAVE quality.
+
+    Width is automatically calculated while
+    preserving the original aspect ratio.
+    """
+
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(source),
+        "-vf",
+        f"scale=-2:{requested_height}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        str(target),
+    ]
+
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+
+    if result.returncode != 0:
+        error = (
+            result.stderr
+            or result.stdout
+            or "FFmpeg conversion failed."
+        )[-3000:]
+
+        print("[FFMPEG ERROR]")
+        print(error)
+
+        raise RuntimeError(error)
+
+
+def run_download(job_id, body):
+    source = None
+
+    try:
         set_job(
             job_id,
             status="processing",
@@ -276,23 +341,19 @@ def run_download(job_id, body):
         )
 
         output = str(
-            DOWNLOADS /
-            f"{job_id}.%(ext)s"
+            DOWNLOADS / f"{job_id}.%(ext)s"
         )
 
         common = base_ytdlp() + [
             "--output",
             output,
-
             "--no-part",
-
-            # Avoid playlist downloads.
             "--no-playlist",
         ]
 
-        # -------------------------
-        # MP3 DOWNLOAD
-        # -------------------------
+        # =========================
+        # MP3
+        # =========================
 
         if body.kind == "audio":
 
@@ -302,69 +363,144 @@ def run_download(job_id, body):
                 "mp3",
                 "--audio-quality",
                 "192K",
-
                 body.url,
             ]
 
             final_extension = ".mp3"
 
-        # -------------------------
-        # VIDEO DOWNLOAD
-        # -------------------------
+            set_job(
+                job_id,
+                progress=15,
+            )
+
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=900,
+            )
+
+            if result.returncode != 0:
+                error = (
+                    result.stderr
+                    or result.stdout
+                    or "Audio download failed."
+                )[-2500:]
+
+                set_job(
+                    job_id,
+                    status="error",
+                    progress=0,
+                    error=error,
+                )
+
+                return
+
+            source = find_output_file(job_id)
+
+            if not source:
+                set_job(
+                    job_id,
+                    status="error",
+                    progress=0,
+                    error="No output file was created.",
+                )
+
+                return
+
+            target = DOWNLOADS / f"{job_id}.mp3"
+
+            if source != target:
+                if target.exists():
+                    target.unlink()
+
+                source.rename(target)
+
+            set_job(
+                job_id,
+                status="finished",
+                progress=100,
+                filename=target.name,
+            )
+
+            return
+
+        # =========================
+        # VIDEO
+        # =========================
+
+        quality = body.quality
+
+        if quality == "best":
+
+            selector = (
+                "bestvideo+bestaudio/"
+                "best"
+            )
+
+            requested_height = None
 
         else:
 
-            quality = body.quality
+            match = re.fullmatch(
+                r"(\d+)p",
+                quality,
+            )
 
-            if quality == "best":
+            if not match:
+                raise ValueError(
+                    "Invalid video quality."
+                )
 
+            requested_height = int(
+                match.group(1)
+            )
+
+            if requested_height not in QUALITY_LADDER:
+                raise ValueError(
+                    "Invalid video quality."
+                )
+
+            # Probe the source so we know whether
+            # a usable source exists at or below
+            # the requested quality.
+            info = probe(body.url)
+
+            source_has_lower_format = (
+                has_video_at_or_below(
+                    info,
+                    requested_height,
+                )
+            )
+
+            if source_has_lower_format:
+
+                # Prefer the closest source quality
+                # at or below the requested height.
+                selector = (
+                    f"bestvideo[height<={requested_height}]"
+                    "+bestaudio/"
+                    f"best[height<={requested_height}]"
+                )
+
+            else:
+
+                # No suitable lower source exists.
+                # Download the best available source
+                # and FFmpeg will create the exact
+                # requested standard quality.
                 selector = (
                     "bestvideo+bestaudio/"
                     "best"
                 )
 
-            else:
-
-                match = re.fullmatch(
-                    r"(\d+)p",
-                    quality,
-                )
-
-                if not match:
-                    raise ValueError(
-                        "Invalid video quality."
-                    )
-
-                height = int(
-                    match.group(1)
-                )
-
-                if height <= 0:
-                    raise ValueError(
-                        "Invalid video quality."
-                    )
-
-                # Prefer video + audio.
-                # If separate streams are not
-                # available, fall back to a
-                # combined format.
-                selector = (
-                    f"bestvideo[height<={height}]"
-                    "+bestaudio/"
-                    f"best[height<={height}]"
-                )
-
-            command = common + [
-                "--format",
-                selector,
-
-                "--merge-output-format",
-                "mp4",
-
-                body.url,
-            ]
-
-            final_extension = ".mp4"
+        command = common + [
+            "--format",
+            selector,
+            "--merge-output-format",
+            "mp4",
+            body.url,
+        ]
 
         set_job(
             job_id,
@@ -383,7 +519,7 @@ def run_download(job_id, body):
             error = (
                 result.stderr
                 or result.stdout
-                or "Download failed."
+                or "Video download failed."
             )[-2500:]
 
             print("[YTDLP DOWNLOAD ERROR]")
@@ -398,22 +534,9 @@ def run_download(job_id, body):
 
             return
 
-        # Find generated file.
-        candidates = [
-            path
-            for path in DOWNLOADS.glob(
-                f"{job_id}.*"
-            )
-            if (
-                path.is_file()
-                and path.suffix not in {
-                    ".part",
-                    ".ytdl",
-                }
-            )
-        ]
+        source = find_output_file(job_id)
 
-        if not candidates:
+        if not source:
 
             set_job(
                 job_id,
@@ -424,22 +547,60 @@ def run_download(job_id, body):
 
             return
 
-        source = max(
-            candidates,
-            key=lambda path: path.stat().st_mtime,
-        )
+        target = DOWNLOADS / f"{job_id}.mp4"
 
-        target = (
-            DOWNLOADS /
-            f"{job_id}{final_extension}"
-        )
+        # =========================
+        # EXACT QUALITY CONVERSION
+        # =========================
 
-        if source != target:
+        if requested_height is not None:
 
-            if target.exists():
-                target.unlink()
+            source_height = 0
 
-            source.rename(target)
+            try:
+                source_info = probe(
+                    body.url
+                )
+
+                heights = actual_video_heights(
+                    source_info
+                )
+
+                if heights:
+                    source_height = max(
+                        heights
+                    )
+
+            except Exception:
+                source_height = 0
+
+            # Always create the requested standard
+            # quality. This handles:
+            #
+            # 1920 -> 1440
+            # 1280 -> 1080
+            # 720  -> 480
+            # 2160 -> 1440
+            #
+            # and also handles upscaling if necessary.
+
+            convert_video_to_quality(
+                source,
+                target,
+                requested_height,
+            )
+
+            if source != target and source.exists():
+                source.unlink()
+
+        else:
+
+            if source != target:
+
+                if target.exists():
+                    target.unlink()
+
+                source.rename(target)
 
         set_job(
             job_id,
@@ -462,6 +623,9 @@ def run_download(job_id, body):
 
     except Exception as error:
 
+        print("[DOWNLOAD FAILED]")
+        print(str(error))
+
         set_job(
             job_id,
             status="error",
@@ -470,30 +634,28 @@ def run_download(job_id, body):
         )
 
 
-# -------------------------
+# =========================
 # HEALTH
-# -------------------------
+# =========================
 
 @app.get("/api/health")
 def health():
-
     return {
         "ok": True,
         "name": "VGSAVE",
-        "version": "1.2.0",
+        "version": "1.4.0",
     }
 
 
-# -------------------------
-# DETECT MEDIA
-# -------------------------
+# =========================
+# DETECT
+# =========================
 
 @app.post("/api/detect")
 @app.post("/formats")
 def detect(body: DetectBody):
 
     if not public_url(body.url):
-
         raise HTTPException(
             400,
             "Enter a valid public http/https URL.",
@@ -501,34 +663,27 @@ def detect(body: DetectBody):
 
     try:
 
-        info = probe(
-            body.url
-        )
+        info = probe(body.url)
 
-        qualities = available_qualities(
+        qualities = standard_qualities(
             info
         )
 
         return {
             "ok": True,
-
-            "title":
+            "title": (
                 info.get("title")
-                or "Video",
-
-            "uploader":
+                or "Video"
+            ),
+            "uploader": (
                 info.get("uploader")
-                or "",
-
-            "extractor":
+                or ""
+            ),
+            "extractor": (
                 info.get("extractor_key")
-                or "",
-
-            # REAL qualities only.
+                or ""
+            ),
             "video": qualities,
-
-            # MP3 is always offered when
-            # yt-dlp can process the media.
             "audio": ["mp3"],
         }
 
@@ -543,16 +698,15 @@ def detect(body: DetectBody):
         )
 
 
-# -------------------------
-# START DOWNLOAD
-# -------------------------
+# =========================
+# DOWNLOAD
+# =========================
 
 @app.post("/api/download")
 @app.post("/download")
 def download(body: DownloadBody):
 
     if not public_url(body.url):
-
         raise HTTPException(
             400,
             "Enter a valid public http/https URL.",
@@ -562,7 +716,6 @@ def download(body: DownloadBody):
         "video",
         "audio",
     ):
-
         raise HTTPException(
             400,
             "Invalid download type.",
@@ -572,11 +725,22 @@ def download(body: DownloadBody):
 
         if body.quality != "best":
 
-            if not re.fullmatch(
-                r"\d+p",
+            match = re.fullmatch(
+                r"(\d+)p",
                 body.quality,
-            ):
+            )
 
+            if not match:
+                raise HTTPException(
+                    400,
+                    "Invalid quality.",
+                )
+
+            requested = int(
+                match.group(1)
+            )
+
+            if requested not in QUALITY_LADDER:
                 raise HTTPException(
                     400,
                     "Invalid quality.",
@@ -590,13 +754,11 @@ def download(body: DownloadBody):
         progress=0,
     )
 
-    thread = threading.Thread(
+    threading.Thread(
         target=run_download,
         args=(job_id, body),
         daemon=True,
-    )
-
-    thread.start()
+    ).start()
 
     return {
         "ok": True,
@@ -604,9 +766,9 @@ def download(body: DownloadBody):
     }
 
 
-# -------------------------
-# DOWNLOAD STATUS
-# -------------------------
+# =========================
+# STATUS
+# =========================
 
 @app.get("/api/status/{job_id}")
 @app.get("/status/{job_id}")
@@ -616,7 +778,6 @@ def status(job_id: str):
         job = jobs.get(job_id)
 
     if not job:
-
         raise HTTPException(
             404,
             "Job not found.",
@@ -628,9 +789,9 @@ def status(job_id: str):
     }
 
 
-# -------------------------
-# DOWNLOAD FILE
-# -------------------------
+# =========================
+# FILE
+# =========================
 
 @app.get("/api/file/{job_id}")
 @app.get("/file/{job_id}")
@@ -646,7 +807,6 @@ def file(job_id: str):
         )
 
     if job.get("status") != "finished":
-
         raise HTTPException(
             404,
             "File is not ready.",
@@ -658,16 +818,16 @@ def file(job_id: str):
     )
 
     if not path.exists():
-
         raise HTTPException(
             404,
-            "File no longer exists.",
+            "File no longer exists."
         )
 
-    if path.suffix == ".mp3":
-        media_type = "audio/mpeg"
-    else:
-        media_type = "video/mp4"
+    media_type = (
+        "audio/mpeg"
+        if path.suffix.lower() == ".mp3"
+        else "video/mp4"
+    )
 
     return FileResponse(
         path,
@@ -676,9 +836,9 @@ def file(job_id: str):
     )
 
 
-# -------------------------
+# =========================
 # FRONTEND
-# -------------------------
+# =========================
 
 app.mount(
     "/",
