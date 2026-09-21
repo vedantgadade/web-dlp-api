@@ -89,13 +89,15 @@ def base_ytdlp():
     pot_provider_url = os.getenv("POT_PROVIDER_URL")
 
     if pot_provider_url:
-        command += [
-            "--extractor-args",
-            (
-                "youtubepot-bgutilhttp:"
-                f"base_url={pot_provider_url}"
-            ),
-        ]
+    command += [
+        "--extractor-args",
+        (
+            "youtubepot-bgutilhttp:"
+            f"base_url={pot_provider_url}"
+        ),
+        "--extractor-args",
+        "youtube:player-client=mweb",
+    ]
 
     return command
 
