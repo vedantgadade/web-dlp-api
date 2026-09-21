@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import threading
@@ -70,7 +71,7 @@ def public_url(value: str) -> bool:
 
 
 def base_ytdlp():
-    return [
+    command = [
         "yt-dlp",
         "--no-playlist",
         "--no-warnings",
@@ -84,8 +85,23 @@ def base_ytdlp():
             "Chrome/124.0.0.0 Safari/537.36"
         ),
         "--extractor-args",
-        "youtube:player_client=android,web",
+        "youtube:player_client=mweb,web",
     ]
+
+    pot_provider_url = os.getenv(
+        "POT_PROVIDER_URL"
+    )
+
+    if pot_provider_url:
+        command += [
+            "--extractor-args",
+            (
+                "youtubepot-bgutilhttp:"
+                f"base_url={pot_provider_url}"
+            ),
+        ]
+
+    return command
 
 
 def probe(url: str):
