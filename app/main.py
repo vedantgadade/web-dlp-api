@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +25,15 @@ DOWNLOADS = ROOT / "downloads"
 DOWNLOADS.mkdir(exist_ok=True)
 
 app = FastAPI(title="VGSAVE", version="1.4.0", docs_url="/docs", redoc_url="/redoc")
+
+# Allow the free Cloudflare Pages frontend to call the Railway API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://vgsave.pages.dev"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 logger = logging.getLogger("vgsave")
 
 # Set VGSAVE_CANONICAL_ORIGIN (for example, https://your-domain.example) at launch.
