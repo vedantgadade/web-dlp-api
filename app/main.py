@@ -22,7 +22,6 @@ jobs = {}
 jobs_lock = threading.Lock()
 
 QUALITIES = [144, 240, 360, 480, 720, 1080, 1440, 2160]
-POT_PROVIDER = os.getenv("POT_PROVIDER_URL", "").strip().rstrip("/")
 
 
 class DetectBody(BaseModel):
@@ -48,19 +47,16 @@ def public_url(value: str) -> bool:
 
 
 def base_ytdlp():
-    args = [
+    # Removed '--js-runtimes deno' and '--remote-components' because standard 
+    # Python Docker containers on Railway don't have Deno installed.
+    # Added mobile client emulation and browser headers to bypass Railway IP blocks.
+    return [
         "yt-dlp",
         "--no-playlist",
         "--no-warnings",
-        "--js-runtimes", "deno",
-        "--remote-components", "ejs:npm",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "--extractor-args", "youtube:player_client=android,web",
     ]
-    if POT_PROVIDER:
-        args += [
-            "--extractor-args",
-            f"youtubepot-bgutilhttp:base_url={POT_PROVIDER}",
-        ]
-    return args
 
 
 def probe(url: str):
@@ -71,7 +67,9 @@ def probe(url: str):
     ]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
-        raise RuntimeError((r.stderr or r.stdout or "Unsupported URL")[-2500:])
+        error_msg = r.stderr or r.stdout or "Unsupported URL"
+        print(f"[YTDLP PROBE ERROR]: {error_msg}")
+        raise RuntimeError(error_msg[-2500:])
     return json.loads(r.stdout)
 
 
@@ -84,7 +82,7 @@ def available(info):
                 found.add(h)
         except Exception:
             pass
-    return [f"{h}p" for h in QUALITIES if h in found]
+    return [f"{h}p" for h in sorted(found)]
 
 
 def set_job(job_id, **values):
@@ -128,8 +126,9 @@ def run_download(job_id, body):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
 
         if r.returncode != 0:
-            set_job(job_id, status="error", progress=0,
-                    error=(r.stderr or r.stdout or "Download failed")[-1800:])
+            err = (r.stderr or r.stdout or "Download failed")[-1800:]
+            print(f"[YTDLP DOWNLOAD ERROR]: {err}")
+            set_job(job_id, status="error", progress=0, error=err)
             return
 
         candidates = [
@@ -137,8 +136,7 @@ def run_download(job_id, body):
             if p.is_file() and p.suffix not in {".part", ".ytdl"}
         ]
         if not candidates:
-            set_job(job_id, status="error", progress=0,
-                    error="No output file was created.")
+            set_job(job_id, status="error", progress=0, error="No output file was created.")
             return
 
         source = max(candidates, key=lambda p: p.stat().st_mtime)
@@ -150,8 +148,7 @@ def run_download(job_id, body):
 
         set_job(job_id, status="finished", progress=100, filename=target.name)
     except subprocess.TimeoutExpired:
-        set_job(job_id, status="error", progress=0,
-                error="Download timed out. Please try again.")
+        set_job(job_id, status="error", progress=0, error="Download timed out. Please try again.")
     except Exception as exc:
         set_job(job_id, status="error", progress=0, error=str(exc)[-1800:])
 
@@ -175,7 +172,8 @@ def detect(body: DetectBody):
             "video": available(info),
             "audio": ["mp3"],
         }
-    except Exception:
+    except Exception as e:
+        print(f"[DETECT FAILED]: {str(e)}")
         raise HTTPException(
             422,
             "This public URL could not be processed right now."
