@@ -47,14 +47,12 @@ def public_url(value: str) -> bool:
 
 
 def base_ytdlp():
-    # Removed '--js-runtimes deno' and '--remote-components' because standard 
-    # Python Docker containers on Railway don't have Deno installed.
-    # Added mobile client emulation and browser headers to bypass Railway IP blocks.
     return [
         "yt-dlp",
         "--no-playlist",
         "--no-warnings",
-        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "--js-runtimes", "deno",
+        "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "--extractor-args", "youtube:player_client=android,web",
     ]
 
