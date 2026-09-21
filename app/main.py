@@ -156,7 +156,9 @@ def health():
     return {"ok": True, "name": "VGSAVE", "version": "1.0.0"}
 
 
+# Accepts both /api/detect and /formats from your Cloudflare frontend
 @app.post("/api/detect")
+@app.post("/formats")
 def detect(body: DetectBody):
     if not public_url(body.url):
         raise HTTPException(400, "Enter a valid public http/https URL.")
@@ -179,6 +181,7 @@ def detect(body: DetectBody):
 
 
 @app.post("/api/download")
+@app.post("/download")
 def download(body: DownloadBody):
     if not public_url(body.url):
         raise HTTPException(400, "Enter a valid public http/https URL.")
@@ -198,6 +201,7 @@ def download(body: DownloadBody):
 
 
 @app.get("/api/status/{job_id}")
+@app.get("/status/{job_id}")
 def status(job_id: str):
     with jobs_lock:
         job = jobs.get(job_id)
@@ -207,6 +211,7 @@ def status(job_id: str):
 
 
 @app.get("/api/file/{job_id}")
+@app.get("/file/{job_id}")
 def file(job_id: str):
     with jobs_lock:
         job = jobs.get(job_id)
