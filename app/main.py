@@ -565,43 +565,42 @@ def run_download(job_id, body):
         # EXACT QUALITY CONVERSION
         # =========================
 
-       if requested_height is not None:
+               if requested_height is not None:
 
-    source_height = 0
+            source_height = 0
 
-    try:
-        source_info = probe(
-            body.url
-        )
+            try:
+                source_info = probe(
+                    body.url
+                )
 
-        heights = actual_video_heights(
-            source_info
-        )
+                heights = actual_video_heights(
+                    source_info
+                )
 
-        if heights:
-            source_height = max(
-                heights
+                if heights:
+                    source_height = max(
+                        heights
+                    )
+
+            except Exception:
+                source_height = 0
+
+            # Convert to a temporary file first.
+            temp_target = DOWNLOADS / f"{job_id}_converted.mp4"
+
+            convert_video_to_quality(
+                source,
+                temp_target,
+                requested_height,
             )
 
-    except Exception:
-        source_height = 0
+            # Remove the original downloaded file.
+            if source.exists():
+                source.unlink()
 
-    # Convert to a temporary file first.
-    temp_target = DOWNLOADS / f"{job_id}_converted.mp4"
-
-    convert_video_to_quality(
-        source,
-        temp_target,
-        requested_height,
-    )
-
-    # Remove the original downloaded file.
-    if source.exists():
-        source.unlink()
-
-    # Rename converted file to the final filename.
-    temp_target.rename(target)
-
+            # Rename converted file to the final filename.
+            temp_target.rename(target)
         else:
 
             if source != target:
