@@ -746,17 +746,31 @@ def run_download(job_id, body):
 # =========================
 # SAFETY MIDDLEWARE
 # =========================
+RATE_LIMITED_ENDPOINTS = {
+    ("POST", "/api/detect"),
+    ("POST", "/api/download"),
+    ("POST", "/formats"),
+    ("POST", "/download"),
+}
+
+
 @app.middleware("http")
 async def public_api_guard(request: Request, call_next):
-    if request.url.path.startswith("/api/") or request.url.path in ("/download", "/formats"):
-        if request.method in ("POST", "PUT", "PATCH"):
-            length = request.headers.get("content-length")
-            try:
-                too_large = length and int(length) > MAX_REQUEST_BYTES
-            except ValueError:
-                return Response("Invalid request size.", status_code=400)
-            if too_large:
-                return Response("Request body is too large.", status_code=413)
+    # Keep write requests small, without applying an arbitrary body limit to
+    # normal reads such as file transfers.
+    if request.method in ("POST", "PUT", "PATCH"):
+        length = request.headers.get("content-length")
+        try:
+            too_large = length and int(length) > MAX_REQUEST_BYTES
+        except ValueError:
+            return Response("Invalid request size.", status_code=400)
+        if too_large:
+            return Response("Request body is too large.", status_code=413)
+
+    # Detection and download creation start subprocess work. Status polling and
+    # file responses deliberately bypass this bucket so active jobs are not
+    # interrupted by the browser's normal polling/download behavior.
+    if (request.method, request.url.path) in RATE_LIMITED_ENDPOINTS:
         client = request.client.host if request.client else "unknown"
         now = time.monotonic()
         bucket = rate_buckets.setdefault(client, [])
