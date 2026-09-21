@@ -309,11 +309,16 @@ def has_video_at_or_below(info, requested_height):
 
 
 def set_job(job_id, **values):
+    """Create or update a job while maintaining its cleanup lifecycle timestamps."""
+    now = time.time()
     with jobs_lock:
-        jobs.setdefault(
-            job_id,
-            {}
-        ).update(values)
+        job = jobs.setdefault(job_id, {})
+        # `created_at` is immutable for the lifetime of a job; every first write
+        # receives it, even when the caller only supplies a status/progress field.
+        job.setdefault("created_at", now)
+        job.update(values)
+        # Always refresh this after caller values so it cannot become stale.
+        job["updated_at"] = now
 
 
 def find_output_file(job_id):
