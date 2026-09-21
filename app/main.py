@@ -561,11 +561,11 @@ def run_download(job_id, body):
 
         target = DOWNLOADS / f"{job_id}.mp4"
 
-        # =========================
+                # =========================
         # EXACT QUALITY CONVERSION
         # =========================
 
-               if requested_height is not None:
+        if requested_height is not None:
 
             source_height = 0
 
@@ -601,6 +601,7 @@ def run_download(job_id, body):
 
             # Rename converted file to the final filename.
             temp_target.rename(target)
+
         else:
 
             if source != target:
