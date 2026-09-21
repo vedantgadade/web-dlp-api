@@ -84,13 +84,9 @@ def base_ytdlp():
             "(KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "--extractor-args",
-        "youtube:player_client=mweb,web",
     ]
 
-    pot_provider_url = os.getenv(
-        "POT_PROVIDER_URL"
-    )
+    pot_provider_url = os.getenv("POT_PROVIDER_URL")
 
     if pot_provider_url:
         command += [
