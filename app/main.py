@@ -871,7 +871,7 @@ def file(job_id: str):
 # =========================
 # PUBLIC PAGES AND SEO
 # =========================
-PUBLIC_PAGES = {"/": "index.html", "/about/": "about.html", "/contact/": "contact.html", "/privacy/": "privacy.html", "/terms/": "terms.html", "/dmca/": "dmca.html", "/disclaimer/": "disclaimer.html", "/faq/": "faq.html"}
+PUBLIC_PAGES = {"/": "index.html", "/about/": "about.html", "/contact/": "contact.html", "/privacy/": "privacy.html", "/terms/": "terms.html", "/dmca/": "dmca.html", "/disclaimer/": "disclaimer.html", "/faq/": "faq.html", "/guides/": "guides.html", "/guides/video-download/": "guides/video-download.html", "/guides/mp3/": "guides/mp3.html", "/guides/video-quality/": "guides/video-quality.html", "/guides/responsible-downloading/": "guides/responsible-downloading.html"}
 
 def canonical_origin(request: Request):
     return CANONICAL_ORIGIN or str(request.base_url).rstrip("/")
