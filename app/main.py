@@ -565,42 +565,40 @@ def run_download(job_id, body):
         # EXACT QUALITY CONVERSION
         # =========================
 
-        if requested_height is not None:
+                if requested_height is not None:
 
-            source_height = 0
+            source_info = probe(body.url)
 
-            try:
-                source_info = probe(
-                    body.url
+            heights = actual_video_heights(source_info)
+
+            source_height = max(heights) if heights else 0
+
+            # If the downloaded source is already exactly
+            # the requested quality, don't re-encode it.
+            if source_height == requested_height:
+
+                if source != target:
+
+                    if target.exists():
+                        target.unlink()
+
+                    source.rename(target)
+
+            else:
+
+                # Convert to a temporary file first.
+                temp_target = DOWNLOADS / f"{job_id}_converted.mp4"
+
+                convert_video_to_quality(
+                    source,
+                    temp_target,
+                    requested_height,
                 )
 
-                heights = actual_video_heights(
-                    source_info
-                )
+                if source.exists():
+                    source.unlink()
 
-                if heights:
-                    source_height = max(
-                        heights
-                    )
-
-            except Exception:
-                source_height = 0
-
-            # Convert to a temporary file first.
-            temp_target = DOWNLOADS / f"{job_id}_converted.mp4"
-
-            convert_video_to_quality(
-                source,
-                temp_target,
-                requested_height,
-            )
-
-            # Remove the original downloaded file.
-            if source.exists():
-                source.unlink()
-
-            # Rename converted file to the final filename.
-            temp_target.rename(target)
+                temp_target.rename(target)
 
         else:
 
