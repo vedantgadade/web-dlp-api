@@ -905,6 +905,15 @@ PUBLIC_PAGES = {
     "/guides/youtube-shorts-downloader/": "guides/youtube-shorts-downloader.html",
     "/guides/mp4-video-downloader/": "guides/mp4-video-downloader.html",
     "/guides/online-video-downloader/": "guides/online-video-downloader.html",
+    "/guides/instagram-video-downloader/": "guides/instagram-video-downloader.html",
+    "/guides/instagram-story-downloader/": "guides/instagram-story-downloader.html",
+    "/guides/tiktok-video-downloader/": "guides/tiktok-video-downloader.html",
+    "/guides/4k-video-downloader/": "guides/4k-video-downloader.html",
+    "/guides/youtube-video-downloader/": "guides/youtube-video-downloader.html",
+    "/guides/youtube-mp3-downloader/": "guides/youtube-mp3-downloader.html",
+    "/guides/youtube-1080p-downloader/": "guides/youtube-1080p-downloader.html",
+    "/guides/tiktok-mp4-downloader/": "guides/tiktok-mp4-downloader.html",
+    "/guides/video-downloader-without-app/": "guides/video-downloader-without-app.html",
 }
 
 def canonical_origin(request: Request):
