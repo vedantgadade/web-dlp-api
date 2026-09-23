@@ -901,6 +901,7 @@ PUBLIC_PAGES = {
     "/guides/download-public-video-pc/": "guides/download-public-video-pc.html",
     "/guides/download-public-video-iphone/": "guides/download-public-video-iphone.html",
     "/guides/troubleshooting/": "guides/troubleshooting.html",
+    "/guides/youtube-shorts-downloader/": "guides/youtube-shorts-downloader.html",
     "/guides/mp4-video-downloader/": "guides/mp4-video-downloader.html",
     "/guides/online-video-downloader/": "guides/online-video-downloader.html",
 }
