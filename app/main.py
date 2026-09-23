@@ -949,7 +949,18 @@ def sitemap(request: Request):
 @app.get("/dmca/", include_in_schema=False)
 @app.get("/disclaimer/", include_in_schema=False)
 @app.get("/faq/", include_in_schema=False)
+@app.get("/guides/", include_in_schema=False)
 def public_page(request: Request):
     return render_page(request, PUBLIC_PAGES[request.url.path])
+
+@app.get("/guides/{guide_path:path}", include_in_schema=False)
+def guide_page(request: Request, guide_path: str):
+    path = f"/guides/{guide_path}"
+    if not path.endswith("/"):
+        path += "/"
+    filename = PUBLIC_PAGES.get(path)
+    if not filename:
+        raise HTTPException(404, "Page not found.")
+    return render_page(request, filename)
 
 app.mount("/assets", StaticFiles(directory=ROOT.parent / "public" / "assets"), name="assets")

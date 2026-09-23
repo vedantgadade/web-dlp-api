@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
 
 jobs:
   seo-consistency:
@@ -17,6 +18,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
+          import re
 
           public = Path("public")
           guides_dir = public / "guides"
@@ -52,9 +54,15 @@ jobs:
                   "canonical": f'<link rel="canonical" href="{url}/">',
                   "description": '<meta name="description"',
                   "robots": '<meta name="robots" content="index,follow">',
+                  "og:type": '<meta property="og:type"',
+                  "og:site_name": '<meta property="og:site_name"',
                   "og:title": '<meta property="og:title"',
                   "og:description": '<meta property="og:description"',
                   "og:url": f'<meta property="og:url" content="{url}/">',
+                  "og:locale": '<meta property="og:locale"',
+                  "twitter:card": '<meta name="twitter:card"',
+                  "twitter:title": '<meta name="twitter:title"',
+                  "twitter:description": '<meta name="twitter:description"',
                   "breadcrumb": '"@type":"BreadcrumbList"',
               }
 
@@ -91,6 +99,14 @@ jobs:
                       target_path = public / target
                       if not target_path.is_file():
                           errors.append(f"app/main.py: PUBLIC_PAGES target missing for {route}: {target}")
+
+          redirects = (public / "_redirects").read_text(encoding="utf-8")
+          for path in sorted(expected):
+              if path == "https://vgsave.pages.dev/":
+                  continue
+              route = "/" + path.removeprefix("https://vgsave.pages.dev/").rstrip("/") + "/"
+              if not any(line.startswith(route + " ") for line in redirects.splitlines()):
+                  errors.append(f"_redirects: missing route {route}")
 
           for url in sorted(sitemap_urls):
               if url.startswith("https://vgsave.pages.dev/guides/") and url != "https://vgsave.pages.dev/guides":
