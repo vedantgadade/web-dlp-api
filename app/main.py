@@ -881,7 +881,28 @@ def file(job_id: str):
 # =========================
 # PUBLIC PAGES AND SEO
 # =========================
-PUBLIC_PAGES = {"/": "index.html", "/about/": "about.html", "/contact/": "contact.html", "/privacy/": "privacy.html", "/terms/": "terms.html", "/dmca/": "dmca.html", "/disclaimer/": "disclaimer.html", "/faq/": "faq.html", "/guides/": "guides.html", "/guides/video-download/": "guides/video-download.html", "/guides/mp3/": "guides/mp3.html", "/guides/video-quality/": "guides/video-quality.html", "/guides/responsible-downloading/": "guides/responsible-downloading.html"}
+PUBLIC_PAGES = {
+    "/": "index.html",
+    "/about/": "about.html",
+    "/contact/": "contact.html",
+    "/privacy/": "privacy.html",
+    "/terms/": "terms.html",
+    "/dmca/": "dmca.html",
+    "/disclaimer/": "disclaimer.html",
+    "/faq/": "faq.html",
+    "/guides/": "guides.html",
+    "/guides/video-download/": "guides/video-download.html",
+    "/guides/mp3/": "guides/mp3.html",
+    "/guides/video-quality/": "guides/video-quality.html",
+    "/guides/responsible-downloading/": "guides/responsible-downloading.html",
+    "/guides/youtube-public-video-download/": "guides/youtube-public-video-download.html",
+    "/guides/instagram-public-video-download/": "guides/instagram-public-video-download.html",
+    "/guides/download-public-video-android/": "guides/download-public-video-android.html",
+    "/guides/download-public-video-pc/": "guides/download-public-video-pc.html",
+    "/guides/download-public-video-iphone/": "guides/download-public-video-iphone.html",
+    "/guides/troubleshooting/": "guides/troubleshooting.html",
+    "/guides/online-video-downloader/": "guides/online-video-downloader.html",
+}
 
 def canonical_origin(request: Request):
     return CANONICAL_ORIGIN or str(request.base_url).rstrip("/")
