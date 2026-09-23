@@ -26,6 +26,19 @@ jobs:
             "https://vgsave.pages.dev/guides/4k-video-downloader/" \
             "https://vgsave.pages.dev/guides/facebook-video-downloader/" \
             "https://vgsave.pages.dev/guides/twitter-video-downloader/" \
+            "https://vgsave.pages.dev/guides/video-download/" \
+            "https://vgsave.pages.dev/guides/mp3/" \
+            "https://vgsave.pages.dev/guides/video-quality/" \
+            "https://vgsave.pages.dev/guides/responsible-downloading/" \
+            "https://vgsave.pages.dev/guides/youtube-public-video-download/" \
+            "https://vgsave.pages.dev/guides/instagram-public-video-download/" \
+            "https://vgsave.pages.dev/guides/download-public-video-android/" \
+            "https://vgsave.pages.dev/guides/download-public-video-pc/" \
+            "https://vgsave.pages.dev/guides/download-public-video-iphone/" \
+            "https://vgsave.pages.dev/guides/troubleshooting/" \
+            "https://vgsave.pages.dev/guides/online-video-downloader/" \
+            "https://vgsave.pages.dev/guides/mp4-video-downloader/" \
+            "https://vgsave.pages.dev/guides/youtube-shorts-downloader/" \
             "https://vgsave.pages.dev/robots.txt" \
             "https://vgsave.pages.dev/sitemap.xml"; do
             echo "Checking $url"
