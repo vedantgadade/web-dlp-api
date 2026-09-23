@@ -914,6 +914,8 @@ PUBLIC_PAGES = {
     "/guides/youtube-1080p-downloader/": "guides/youtube-1080p-downloader.html",
     "/guides/tiktok-mp4-downloader/": "guides/tiktok-mp4-downloader.html",
     "/guides/video-downloader-without-app/": "guides/video-downloader-without-app.html",
+    "/guides/facebook-video-downloader/": "guides/facebook-video-downloader.html",
+    "/guides/twitter-video-downloader/": "guides/twitter-video-downloader.html",
 }
 
 def canonical_origin(request: Request):

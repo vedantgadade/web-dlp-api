@@ -24,6 +24,8 @@ jobs:
             "https://vgsave.pages.dev/guides/tiktok-video-downloader/" \
             "https://vgsave.pages.dev/guides/tiktok-mp4-downloader/" \
             "https://vgsave.pages.dev/guides/4k-video-downloader/" \
+            "https://vgsave.pages.dev/guides/facebook-video-downloader/" \
+            "https://vgsave.pages.dev/guides/twitter-video-downloader/" \
             "https://vgsave.pages.dev/robots.txt" \
             "https://vgsave.pages.dev/sitemap.xml"; do
             echo "Checking $url"
