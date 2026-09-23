@@ -65,11 +65,32 @@ jobs:
               if url not in sitemap_urls:
                   errors.append(f"{path}: missing from sitemap.xml")
 
+              guide_links = html.count('href="/guides/')
+              if guide_links < 2:
+                  errors.append(f"{path}: fewer than 2 internal guide links ({guide_links})")
+
               expected.add(url)
 
           missing = sorted(expected - sitemap_urls)
           for url in missing:
               errors.append(f"sitemap.xml: missing expected URL {url}")
+
+          # Keep FastAPI's public-page registry synchronized with the static guide files.
+          main_py = (Path("app") / "main.py").read_text(encoding="utf-8")
+          marker = "PUBLIC_PAGES = {"
+          if marker not in main_py:
+              errors.append("app/main.py: PUBLIC_PAGES registry not found")
+          else:
+              registry = main_py.split(marker, 1)[1].split("}", 1)[0]
+              for line in registry.splitlines():
+                  if '"/guides/' not in line or ':' not in line:
+                      continue
+                  route = line.split(":", 1)[0].strip().strip('"')
+                  target = line.split(":", 1)[1].strip().strip(",").strip().strip('"')
+                  if route.startswith("/guides/") and target:
+                      target_path = public / target
+                      if not target_path.is_file():
+                          errors.append(f"app/main.py: PUBLIC_PAGES target missing for {route}: {target}")
 
           for url in sorted(sitemap_urls):
               if url.startswith("https://vgsave.pages.dev/guides/") and url != "https://vgsave.pages.dev/guides":
