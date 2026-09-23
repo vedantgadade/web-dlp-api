@@ -1,0 +1,25 @@
+name: Production smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public pages
+        run: |
+          set -e
+          for url in             "https://vgsave.pages.dev/"             "https://vgsave.pages.dev/guides/"             "https://vgsave.pages.dev/guides/instagram-reels-downloader/"             "https://vgsave.pages.dev/robots.txt"             "https://vgsave.pages.dev/sitemap.xml"; do
+            echo "Checking $url"
+            curl --fail --silent --show-error --location --max-time 20 -o /dev/null "$url"
+          done
+
+      - name: Check custom 404
+        run: |
+          set -e
+          status="$(curl --silent --show-error --location --max-time 20 -o /tmp/vgsave-404.html -w '%{http_code}' 'https://vgsave.pages.dev/launch-smoke-test-not-found')"
+          test "$status" = "404"
+          grep -qi "Page not found" /tmp/vgsave-404.html
