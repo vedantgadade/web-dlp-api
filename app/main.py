@@ -916,6 +916,11 @@ PUBLIC_PAGES = {
     "/guides/video-downloader-without-app/": "guides/video-downloader-without-app.html",
     "/guides/facebook-video-downloader/": "guides/facebook-video-downloader.html",
     "/guides/twitter-video-downloader/": "guides/twitter-video-downloader.html",
+    "/guides/youtube-4k-video-downloader/": "guides/youtube-4k-video-downloader.html",
+    "/guides/instagram-mp4-downloader/": "guides/instagram-mp4-downloader.html",
+    "/guides/facebook-mp4-downloader/": "guides/facebook-mp4-downloader.html",
+    "/guides/twitter-x-mp4-downloader/": "guides/twitter-x-mp4-downloader.html",
+    "/guides/tiktok-video-downloader-without-app/": "guides/tiktok-video-downloader-without-app.html",
 }
 
 def canonical_origin(request: Request):
