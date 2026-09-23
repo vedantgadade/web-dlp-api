@@ -16,7 +16,6 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
           import xml.etree.ElementTree as ET
 
           public = Path("public")
@@ -34,6 +33,15 @@ jobs:
 
           expected = {"https://vgsave.pages.dev/guides"}
           errors = []
+
+          hub = (public / "guides.html").read_text(encoding="utf-8")
+          for label, needle in {
+              "guides hub canonical": '<link rel="canonical" href="https://vgsave.pages.dev/guides/">',
+              "guides hub description": '<meta name="description"',
+              "guides hub breadcrumb": '"@type":"BreadcrumbList"',
+          }.items():
+              if needle not in hub:
+                  errors.append(f"public/guides.html: missing {label}")
 
           for path in guide_files:
               html = path.read_text(encoding="utf-8")
@@ -62,6 +70,12 @@ jobs:
           missing = sorted(expected - sitemap_urls)
           for url in missing:
               errors.append(f"sitemap.xml: missing expected URL {url}")
+
+          for url in sorted(sitemap_urls):
+              if url.startswith("https://vgsave.pages.dev/guides/") and url != "https://vgsave.pages.dev/guides":
+                  slug = url.rsplit("/", 1)[-1]
+                  if not (guides_dir / f"{slug}.html").is_file():
+                      errors.append(f"sitemap.xml: guide URL has no matching file: {url}")
 
           duplicate_urls = []
           all_locs = [
