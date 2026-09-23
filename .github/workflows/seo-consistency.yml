@@ -1,0 +1,86 @@
+name: SEO consistency check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  seo-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check repository
+        uses: actions/checkout@v4
+
+      - name: Validate public guide SEO
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import xml.etree.ElementTree as ET
+
+          public = Path("public")
+          guides_dir = public / "guides"
+
+          guide_files = sorted(guides_dir.glob("*.html"))
+          assert guide_files, "No guide pages found"
+
+          sitemap = ET.parse(public / "sitemap.xml").getroot()
+          ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+          sitemap_urls = {
+              (node.find("sm:loc", ns).text or "").rstrip("/")
+              for node in sitemap.findall("sm:url", ns)
+          }
+
+          expected = {"https://vgsave.pages.dev/guides"}
+          errors = []
+
+          for path in guide_files:
+              html = path.read_text(encoding="utf-8")
+              slug = path.stem
+              url = f"https://vgsave.pages.dev/guides/{slug}"
+
+              checks = {
+                  "canonical": f'<link rel="canonical" href="{url}/">',
+                  "description": '<meta name="description"',
+                  "robots": '<meta name="robots" content="index,follow">',
+                  "og:title": '<meta property="og:title"',
+                  "og:description": '<meta property="og:description"',
+                  "og:url": f'<meta property="og:url" content="{url}/">',
+                  "breadcrumb": '"@type":"BreadcrumbList"',
+              }
+
+              for label, needle in checks.items():
+                  if needle not in html:
+                      errors.append(f"{path}: missing {label}")
+
+              if url not in sitemap_urls:
+                  errors.append(f"{path}: missing from sitemap.xml")
+
+              expected.add(url)
+
+          missing = sorted(expected - sitemap_urls)
+          for url in missing:
+              errors.append(f"sitemap.xml: missing expected URL {url}")
+
+          duplicate_urls = []
+          all_locs = [
+              (node.find("sm:loc", ns).text or "").rstrip("/")
+              for node in sitemap.findall("sm:url", ns)
+          ]
+          seen = set()
+          for url in all_locs:
+              if url in seen:
+                  duplicate_urls.append(url)
+              seen.add(url)
+
+          for url in duplicate_urls:
+              errors.append(f"sitemap.xml: duplicate URL {url}")
+
+          if errors:
+              print("\n".join(errors))
+              raise SystemExit(1)
+
+          print(f"SEO consistency OK: {len(guide_files)} guide pages checked.")
+          print(f"Sitemap URLs checked: {len(all_locs)}")
+          PY
