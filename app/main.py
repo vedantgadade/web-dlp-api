@@ -158,7 +158,7 @@ def base_ytdlp():
                 f"base_url={pot_provider_url}"
             ),
             "--extractor-args",
-            "youtube:player-client=mweb",
+            "youtube:player-client=mweb,web_embedded",
         ]
 
     return command
