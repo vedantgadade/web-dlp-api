@@ -446,6 +446,35 @@ def convert_video_to_quality(
         raise RuntimeError(error)
 
 
+def move_video_to_mp4(source, target):
+    """Create a real MP4 file rather than renaming a different container."""
+    if source == target:
+        return
+    if source.suffix.lower() == ".mp4":
+        target.unlink(missing_ok=True)
+        source.rename(target)
+        return
+
+    remux = ["ffmpeg", "-y", "-i", str(source), "-c", "copy", "-movflags", "+faststart", str(target)]
+    result = subprocess.run(remux, capture_output=True, text=True, timeout=900)
+    if result.returncode == 0 and target.is_file() and target.stat().st_size > 0:
+        source.unlink(missing_ok=True)
+        return
+
+    target.unlink(missing_ok=True)
+    transcode = [
+        "ffmpeg", "-y", "-i", str(source),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(target),
+    ]
+    result = subprocess.run(transcode, capture_output=True, text=True, timeout=900)
+    if result.returncode != 0 or not target.is_file() or target.stat().st_size == 0:
+        target.unlink(missing_ok=True)
+        error = (result.stderr or result.stdout or "Could not convert this video to MP4.")[-2500:]
+        raise RuntimeError(error)
+    source.unlink(missing_ok=True)
+
+
 def run_download(job_id, body):
     source = None
 
@@ -675,22 +704,12 @@ def run_download(job_id, body):
             # No FFmpeg conversion is needed.
             if source_height == requested_height:
 
-                if source != target:
-
-                    if target.exists():
-                        target.unlink()
-
-                    source.rename(target)
+                move_video_to_mp4(source, target)
 
             # Never upscale a smaller source.
             elif source_height > 0 and source_height < requested_height:
 
-                if source != target:
-
-                    if target.exists():
-                        target.unlink()
-
-                    source.rename(target)
+                move_video_to_mp4(source, target)
 
             else:
 
@@ -714,12 +733,7 @@ def run_download(job_id, body):
 
         else:
 
-            if source != target:
-
-                if target.exists():
-                    target.unlink()
-
-                source.rename(target)
+            move_video_to_mp4(source, target)
 
         set_job(
             job_id,
