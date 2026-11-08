@@ -808,7 +808,7 @@ async def public_api_guard(request: Request, call_next):
 # =========================
 # HEALTH
 # =========================
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     return {"ok": True, "name": "VGSAVE", "version": "1.4.0"}
 
