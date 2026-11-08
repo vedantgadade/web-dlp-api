@@ -1,4 +1,4 @@
-const API_ORIGIN = "https://vgsave-downloader-production.up.railway.app";
+const API_ORIGIN = "https://web-dlp-api-17wm.onrender.com";
 const $ = (selector) => document.querySelector(selector);
 const result = $("#result");
 const input = $("#url");
