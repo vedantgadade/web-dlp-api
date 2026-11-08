@@ -29,7 +29,7 @@ app = FastAPI(title="VGSAVE", version="1.4.0", docs_url="/docs", redoc_url="/red
 # Allow the free Cloudflare Pages frontend to call the Railway API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://vgsave.pages.dev"],
+    allow_origins=["https://vgsave.pages.dev", "https://render-backend-integration.vgsave.pages.dev", "https://9bf2cd68.vgsave.pages.dev"],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
